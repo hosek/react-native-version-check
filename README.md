@@ -98,6 +98,12 @@ protected List<ReactPackage> getPackages() {
 import { Linking } from 'react-native';
 import VersionCheck from 'react-native-version-check';
 
+ VersionCheck.needUpdate({
+      provider: 'jsonFile',
+      url: 'https://raw.githubusercontent.com/hosek/react-native-version-check/master/version.json',
+      platform: 'android'
+    }).then(res => this.setState(res));
+
 VersionCheck.getCountry()
   .then(country => console.log(country));          // KR
 console.log(VersionCheck.getPackageName());        // com.reactnative.app
