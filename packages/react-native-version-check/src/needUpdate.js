@@ -29,15 +29,21 @@ function getVersionWithDepth(version: string, depth: number): string {
 export type NeedUpdateOption = {
   currentVersion?: string,
   latestVersion?: string,
+  platform?: string,
+  url?: string,
   depth?: number,
   ignoreErrors?: boolean,
 };
 
 export type NeedUpdateResult = {
   isNeeded: boolean,
+  canSkip: boolean,
   storeUrl: string,
   currentVersion: string,
   latestVersion: string,
+  minimalVersion: string;
+  forcedVersion: string;
+  blackList: string[];
 };
 
 export default async function needUpdate(
@@ -57,35 +63,55 @@ export default async function needUpdate(
       option.currentVersion = getVersionInfo().getCurrentVersion();
     }
 
-    let latestVersion;
-    let providerStoreUrl = '';
+    let vlatestVersion;
+    let vminimalVersion;
+    let vforcedVersion;
+    let vblackList;
+    let vproviderStoreUrl = '';
 
     if (isNil(option.latestVersion)) {
       if (option.provider.getVersion) {
         const {
           version,
           storeUrl,
+          minimalVersion,
+          forcedVersion,
+          blackList
         }: IVersionAndStoreUrl = await option.provider.getVersion(option);
-        latestVersion = version;
-        providerStoreUrl = storeUrl;
+        vlatestVersion = version;
+        vproviderStoreUrl = storeUrl;
+        vminimalVersion = minimalVersion;
+        vforcedVersion = forcedVersion;
+        vblackList = blackList;
       }
 
       if (providers[option.provider]) {
-        const { version, storeUrl }: IVersionAndStoreUrl = await providers[
+        const { 
+          version,
+          storeUrl,
+          minimalVersion,
+          forcedVersion,
+          blackList }: IVersionAndStoreUrl = await providers[
           option.provider
         ].getVersion(option);
-        latestVersion = version;
-        providerStoreUrl = storeUrl;
+        vlatestVersion = version;
+        vproviderStoreUrl = storeUrl;
+        vminimalVersion = minimalVersion;
+        vforcedVersion = forcedVersion;
+        vblackList = blackList;
       }
 
-      option.latestVersion = latestVersion || (await getLatestVersion(option));
+      option.latestVersion = vlatestVersion || (await getLatestVersion(option));
     }
 
     return checkIfUpdateNeeded(
       option.currentVersion,
       option.latestVersion,
+      vminimalVersion,
+      vforcedVersion,
+      vblackList,
       option,
-      providerStoreUrl
+      vproviderStoreUrl
     );
   } catch (e) {
     if (option.ignoreErrors) {
@@ -96,9 +122,37 @@ export default async function needUpdate(
   }
 }
 
+function canSkip(forcedVersion,currentVersionWithDepth,blackList,option) {
+  console.log(option.provider);
+  console.log(forcedVersion);
+  console.log(currentVersionWithDepth);
+  if (isNil(option.provider) || option.provider !== 'jsonFile') {
+    return false;
+  }
+  if(!isNil(blackList) && blackList.includes(currentVersionWithDepth)){
+    return false;
+  }
+  return semver.gt(currentVersionWithDepth,forcedVersion);
+}
+
+function isNeeded(latestVersionWithDepth,currentVersionWithDepth,minimalVersion,blackList,option){
+  if (isNil(option.provider) || option.provider !== 'jsonFile') {
+    return semver.gt(latestVersionWithDepth, currentVersionWithDepth);
+  }
+
+  if(!isNil(blackList) && blackList.includes(currentVersionWithDepth)){
+    return true;
+  }
+  return semver.gt(minimalVersion,currentVersionWithDepth);
+  
+}
+
 function checkIfUpdateNeeded(
   currentVersion,
   latestVersion,
+  minimalVersion,
+  forcedVersion,
+  blackList,
   option,
   providerStoreUrl
 ) {
@@ -112,10 +166,14 @@ function checkIfUpdateNeeded(
   );
 
   const response = {
-    isNeeded: semver.gt(latestVersionWithDepth, currentVersionWithDepth),
+    isNeeded: isNeeded(latestVersionWithDepth,currentVersionWithDepth,minimalVersion,blackList,option),
+    canSkip: canSkip(forcedVersion,currentVersionWithDepth,blackList,option),
     storeUrl: providerStoreUrl,
     currentVersion,
     latestVersion,
+    minimalVersion,
+    forcedVersion,
+    blackList
   };
 
   return Promise.resolve(response);

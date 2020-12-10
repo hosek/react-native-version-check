@@ -5,5 +5,8 @@ export interface IProvider {
 
 export interface IVersionAndStoreUrl {
   version: string;
+  minimalVersion: string;
+  forcedVersion: string;
+  blackList: string[];
   storeUrl: string;
 }

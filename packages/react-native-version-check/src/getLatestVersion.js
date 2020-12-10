@@ -11,6 +11,8 @@ const latestVersion = null;
 export type GetLatestVersionOption = {
   forceUpdate?: boolean,
   provider?: string | Function | IProvider,
+  url?: string,
+  platform?: string,
   fetchOptions?: any,
   ignoreErrors?: boolean,
 };
